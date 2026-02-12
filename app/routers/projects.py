@@ -12,11 +12,9 @@ def get_projects(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Admin sees everything
     if current_user.role == UserRole.ADMIN:
         return db.query(Project).all()
 
-    # Standard user → only assigned projects
     return (
         db.query(Project)
         .join(ProjectUser)
@@ -35,11 +33,9 @@ def get_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Admin bypass
     if current_user.role == UserRole.ADMIN:
         return project
 
-    # Check assignment
     assignment = (
         db.query(ProjectUser)
         .filter(

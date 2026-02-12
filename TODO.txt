@@ -1,0 +1,31 @@
+🛠 Phase 1: Backend "Final Polish"
+CORS Config: Add CORSMiddleware to app/main.py to allow the React dev server (port 5173) to communicate with FastAPI.
+
+Dependency Audit: Verify requirements.txt includes bcrypt==4.0.1 and passlib[bcrypt].
+
+Cleanup: Remove all DEBUG print statements and commented-out "evil twin" code from the auth.py migration.
+
+Seed Check: Run seed_admin.py on a fresh app.db to ensure the "Quick Start" works for the recruiter.
+
+⚛️ Phase 2: Frontend Setup (React + TS)
+Project Init: Initialize the frontend using Vite: npm create vite@latest client -- --template react-ts.
+
+Axios/Fetch Setup: Create a base API instance with a request interceptor to automatically attach the JWT token to headers.
+
+Auth Context: Build a useAuth hook to handle login, logout, and storing the token in localStorage.
+
+🎨 Phase 3: Core UI Development
+Login Page: Simple form to POST to /login and save the token.
+
+Project Dashboard:
+
+Admin View: See all projects.
+
+User View: See only assigned projects (testing the isolation logic you just built!).
+
+Instance Manager: A view for each project to list instances and a toggle to "Activate" an instance (testing the Single Production Rule).
+
+📹 Phase 4: Submission Preparation
+README: Write a concise guide on how to run the backend, seed the admin, and start the frontend.
+
+Demo Video: Record a 3-5 minute walkthrough highlighting the RBAC and Business Rules.

@@ -4,14 +4,13 @@ from app.routers.auth import hash_password
 
 def create_admin():
     db = SessionLocal()
-    # Check if admin exists so we don't create duplicates
     admin = db.query(User).filter(User.email == "admin@much.com").first()
     
     if not admin:
         admin_user = User(
             email="admin@much.com",
-            hashed_password=hash_password("admin123"), # Change this!
-            role=UserRole.ADMIN # Using your Enum
+            hashed_password=hash_password("admin123"), 
+            role=UserRole.ADMIN 
         )
         db.add(admin_user)
         db.commit()
