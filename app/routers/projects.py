@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Project, ProjectUser, User, UserRole
-from ..auth import get_current_user
+from ..models import Project, ProjectUser, User, UserRole, Client
+from ..auth import get_current_user, get_current_admin
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -56,3 +56,34 @@ def get_project(
         )
 
     return project
+
+@router.post("/")
+def create_project(
+    name: str,
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_admin = Depends(get_current_admin)
+):
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    project = Project(name=name, client_id=client_id)
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+
+    return project
+
+@router.post("/{project_id}/assign/{user_id}")
+def assign_user_to_project(
+    project_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_admin = Depends(get_current_admin)
+):
+    assignment = ProjectUser(project_id=project_id, user_id=user_id)
+    db.add(assignment)
+    db.commit()
+
+    return {"message": "User assigned to project"}
