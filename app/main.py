@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends
 from .database import engine, Base
 from . import models
-from .routers import auth, projects, clients
+from .routers import auth, projects, clients, instances
 
 from .auth import get_current_user
 from .models import User
@@ -26,3 +26,4 @@ def read_me(current_user: User = Depends(get_current_user)):
 app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(clients.router)
+app.include_router(instances.router)
