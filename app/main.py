@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
 from . import models
 from .routers import auth, projects, clients, instances
@@ -7,6 +8,21 @@ from .auth import get_current_user
 from .models import User
 
 app = FastAPI()
+
+# Allowed origins
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+# 3. Add the middleware to your app instance
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Allows GET, POST, PUT, DELETE, etc.
+    allow_headers=["*"], # Allows Authorization headers, Content-Type, etc.
+)
 
 Base.metadata.create_all(bind=engine)
 

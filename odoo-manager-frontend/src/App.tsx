@@ -1,13 +1,13 @@
-import { Routes, Route } from "react-router-dom";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
+import { Routes, Route } from 'react-router-dom';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
 import { ProtectedRoute } from "./components/ProtectedRoute";
-
-export default function App() {
+function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route
+      <Route path="/dashboard" element={<Dashboard />} />
+       <Route
         path="/"
         element={
           <ProtectedRoute>
@@ -18,3 +18,5 @@ export default function App() {
     </Routes>
   );
 }
+
+export default App;
