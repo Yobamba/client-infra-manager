@@ -28,14 +28,15 @@ export default function Dashboard() {
       <h1>Dashboard</h1>
 
       {user ? (
-      <p>
-        Welcome back, {user?.email}! (Role: {user?.role})
-      </p>
+        <p>
+          Welcome back, {user?.email}! (Role: {user?.role})
+        </p>
       ) : (
         <p>Loading user data...</p>
       )}
-      
-    
+
+      {user?.role === "ADMIN" && <Link to="/admin">Admin Panel</Link>}
+
       <button onClick={logout}>Logout</button>
 
       <hr />
@@ -46,9 +47,7 @@ export default function Dashboard() {
 
       {projects.map((project) => (
         <div key={project.id}>
-          <Link to={`/projects/${project.id}`}>
-            {project.name}
-          </Link>
+          <Link to={`/projects/${project.id}`}>{project.name}</Link>
         </div>
       ))}
     </div>
