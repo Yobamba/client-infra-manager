@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import AdminInstances from "./pages/AdminInstances";
 import ProjectDetails from "./pages/ProjectDetails";
 import Admin from "./pages/Admin";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -28,8 +29,17 @@ function App() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute adminOnly={true}>
             <Admin />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/instances"
+        element={
+          <ProtectedRoute adminOnly>
+            <AdminInstances />
           </ProtectedRoute>
         }
       />

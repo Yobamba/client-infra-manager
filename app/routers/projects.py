@@ -5,10 +5,12 @@ from ..database import get_db
 from ..models import Project, ProjectUser, User, UserRole, Client
 from ..auth import get_current_user, get_current_admin
 from .. import schemas
+from ..schemas import ProjectResponse
+
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
-@router.get("/")
+@router.get("/", response_model=list[ProjectResponse])
 def get_projects(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -18,10 +20,39 @@ def get_projects(
 
     return (
         db.query(Project)
-        .join(ProjectUser)
-        .filter(ProjectUser.user_id == current_user.id)
+        .join(Project.users)
+        .filter(User.id == current_user.id)
         .all()
     )
+    
+@router.delete("/{project_id}/assign/{user_id}")
+def remove_user_from_project(
+    project_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_admin = Depends(get_current_admin)
+):
+    assignment = (
+        db.query(ProjectUser)
+        .filter(
+            ProjectUser.project_id == project_id,
+            ProjectUser.user_id == user_id
+        )
+        .first()
+    )
+
+    if not assignment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Assignment not found"
+        )
+
+    db.delete(assignment)
+    db.commit()
+
+    return {"message": "User removed from project"}
+
+
 
 @router.get("/{project_id}")
 def get_project(
@@ -78,7 +109,26 @@ def assign_user_to_project(
     db: Session = Depends(get_db),
     current_admin = Depends(get_current_admin)
 ):
-    assignment = ProjectUser(project_id=project_id, user_id=user_id)
+    existing = (
+        db.query(ProjectUser)
+        .filter(
+            ProjectUser.project_id == project_id,
+            ProjectUser.user_id == user_id
+        )
+        .first()
+    )
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User already assigned to project"
+        )
+
+    assignment = ProjectUser(
+        project_id=project_id,
+        user_id=user_id
+    )
+
     db.add(assignment)
     db.commit()
 

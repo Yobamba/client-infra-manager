@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+
 import axios from "axios";
 import api from "../api/axios";
-import type { User } from "../types/user";
+import { Link } from "react-router-dom";
+import type { User, UserWithProjects } from "../types/user";
 import type { Project } from "../types/project";
 import type { Client } from "../types/client";
 
@@ -10,6 +12,9 @@ export default function Admin() {
   const [success, setSuccess] = useState("");
 
   const [users, setUsers] = useState<User[]>([]);
+  const [usersWithProjects, setUsersWithProjects] = useState<
+    UserWithProjects[]
+  >([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | "">("");
   const [selectedProjectId, setSelectedProjectId] = useState<number | "">("");
@@ -39,23 +44,55 @@ export default function Admin() {
     }
   };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      const [clientsRes, usersRes, projectsRes] = await Promise.all([
-        api.get("/clients"),
-        api.get("/users"),
-        api.get("/projects"),
-      ]);
+      const [clientsRes, usersRes, usersWithProjectsRes, projectsRes] =
+        await Promise.all([
+          api.get("/clients"),
+          api.get("/users"),
+          api.get("/users/with-projects"),
+          api.get("/projects"),
+        ]);
 
       setClients(clientsRes.data);
       setUsers(usersRes.data);
+      setUsersWithProjects(usersWithProjectsRes.data);
       setProjects(projectsRes.data);
     } catch {
       setError("Failed to load admin data");
     }
-  };
+  }, []);
 
-  useEffect(() => {}, []);
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initLoad() {
+      try {
+        const [clientsRes, usersRes, usersWithProjectsRes, projectsRes] =
+          await Promise.all([
+            api.get("/clients"),
+            api.get("/users"),
+            api.get("/users/with-projects"),
+            api.get("/projects"),
+          ]);
+
+        if (isMounted) {
+          setClients(clientsRes.data);
+          setUsers(usersRes.data);
+          setUsersWithProjects(usersWithProjectsRes.data);
+          setProjects(projectsRes.data);
+        }
+      } catch {
+        if (isMounted) setError("Failed to load admin data");
+      }
+    }
+
+    initLoad();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // No dependencies needed because it's self-contained
 
   const handleCreateUser = async () => {
     try {
@@ -85,9 +122,21 @@ export default function Admin() {
       await api.post(`/projects/${selectedProjectId}/assign/${selectedUserId}`);
 
       setSuccess("User assigned successfully!");
+      loadData();
     } catch (err) {
       console.error(err);
       setError("Failed to assign user");
+    }
+  };
+
+  const handleRemoveUser = async (projectId: number, userId: number) => {
+    try {
+      await api.delete(`/projects/${projectId}/assign/${userId}`);
+      setSuccess("User removed from project");
+      loadData();
+    } catch (err) {
+      console.error(err);
+      setError("Failed to remove user");
     }
   };
 
@@ -136,6 +185,10 @@ export default function Admin() {
 
   return (
     <div style={{ padding: "2rem", maxWidth: "800px" }}>
+      <nav style={{ marginBottom: "2rem", display: "flex", gap: "10px" }}>
+        <Link to="/admin">General Admin</Link>
+        <Link to="/admin/instances">Manage Instances</Link>
+      </nav>
       <h1>Admin Panel</h1>
 
       {error && <p style={{ color: "red" }}>{error}</p>}
@@ -251,10 +304,48 @@ export default function Admin() {
           ))}
         </ul>
 
+        <h2>Users With Projects</h2>
+        <ul>
+          {usersWithProjects.map((user) => (
+            <li key={user.id}>
+              <strong>{user.email}</strong> ({user.role})
+              <ul>
+                {user.projects.length > 0 ? (
+                  user.projects.map((project) => (
+                    <li key={project.id}>{project.name}</li>
+                  ))
+                ) : (
+                  <li>No projects assigned</li>
+                )}
+              </ul>
+            </li>
+          ))}
+        </ul>
+
         <h2>Existing Projects</h2>
         <ul>
           {projects.map((p) => (
-            <li key={p.id}>{p.name}</li>
+            <li key={p.id}>
+              <strong>{p.name}</strong>
+
+              <ul>
+                {p.users.length > 0 ? (
+                  p.users.map((u) => (
+                    <li key={u.id}>
+                      {u.email}
+                      <button
+                        style={{ marginLeft: "10px" }}
+                        onClick={() => handleRemoveUser(p.id, u.id)}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))
+                ) : (
+                  <li>No users assigned</li>
+                )}
+              </ul>
+            </li>
           ))}
         </ul>
       </section>

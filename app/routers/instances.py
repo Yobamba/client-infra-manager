@@ -117,13 +117,11 @@ def create_instance(
 @router.patch("/{instance_id}")
 def update_instance(
     instance_id: int,
-    name: str = None,
-    url: str = None,
-    instance_type: OdooInstanceType = None,
-    is_active: bool = None,
+    data: schemas.InstanceUpdate,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
+
     # 1. Fetch the existing record
     instance = db.query(OdooInstance).filter(OdooInstance.id == instance_id).first()
     
@@ -143,8 +141,9 @@ def update_instance(
 
     # 3. THE SINGLE PRODUCTION RULE (Validation)
     # We check if the NEW state being requested would violate the rule
-    target_type = instance_type if instance_type is not None else instance.instance_type
-    target_active = is_active if is_active is not None else instance.is_active
+    target_type = data.instance_type if data.instance_type is not None else instance.instance_type
+    target_active = data.is_active if data.is_active is not None else instance.is_active
+
 
     if target_type == OdooInstanceType.PRODUCTION and target_active:
         conflict = db.query(OdooInstance).filter(
@@ -161,10 +160,15 @@ def update_instance(
             )
 
     # 4. Apply the updates only if they were provided
-    if name is not None: instance.name = name
-    if url is not None: instance.url = url
-    if instance_type is not None: instance.instance_type = instance_type
-    if is_active is not None: instance.is_active = is_active
+    if data.name is not None:
+        instance.name = data.name
+    if data.url is not None:
+        instance.url = data.url
+    if data.instance_type is not None:
+        instance.instance_type = data.instance_type
+    if data.is_active is not None:
+        instance.is_active = data.is_active
+
 
     db.commit()
     db.refresh(instance)
