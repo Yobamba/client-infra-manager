@@ -18,3 +18,10 @@ def create_client(
     db.commit()
     db.refresh(client)
     return client
+
+@router.get("/")
+def get_clients(
+    db: Session = Depends(get_db),
+    current_admin = Depends(get_current_admin)
+):
+    return db.query(Client).all()

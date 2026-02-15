@@ -7,3 +7,7 @@ class InstanceCreate(BaseModel):
     instance_type: OdooInstanceType
     is_active: bool
     project_id: int
+    
+class ProjectCreate(BaseModel):
+    name: str
+    client_id: int
