@@ -53,8 +53,10 @@ type SortKey = "name" | "instance_type" | "is_active" | "url";
 type SortDir = "asc" | "desc";
 
 export default function AdminInstances() {
-  const [instances, setInstances] = useState<Instance[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [instancesByProject, setInstancesByProject] = useState<
+    Record<string, Instance[]>
+  >({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -82,12 +84,30 @@ export default function AdminInstances() {
     setLoading(true);
     setError("");
     try {
-      const [instRes, projRes] = await Promise.all([
-        api.get("/instances"),
-        api.get("/projects"),
-      ]);
-      setInstances(instRes.data);
-      setProjects(projRes.data);
+      const projRes = await api.get("/projects");
+      const projectsData: Project[] = projRes.data;
+      setProjects(projectsData);
+
+      const instancePromises = projectsData.map((p: Project) =>
+        api.get(`/instances?project_id=${p.id}`)
+      );
+
+      const instanceResults = await Promise.allSettled(instancePromises);
+
+      const instancesMap: Record<string, Instance[]> = {};
+      projectsData.forEach((p: Project, index: number) => {
+        const result = instanceResults[index];
+        if (result.status === "fulfilled") {
+          instancesMap[p.id] = result.value.data;
+        } else {
+          console.error(
+            `Failed to load instances for project ${p.name}`,
+            result.reason
+          );
+          instancesMap[p.id] = [];
+        }
+      });
+      setInstancesByProject(instancesMap);
     } catch {
       setError("Failed to load data");
     } finally {
@@ -99,6 +119,54 @@ export default function AdminInstances() {
     loadData();
   }, [loadData]);
 
+  // const handleSort = (key: SortKey) => {
+  //   if (sortKey === key) {
+  //     setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+  //   } else {
+  //     setSortKey(key);
+  //     setSortDir("asc");
+  //   }
+  // };
+
+  // const loadData = useCallback(async () => {
+  //   setLoading(true);
+  //   setError("");
+  //   try {
+  //     const projRes = await api.get("/projects");
+  //     const projectsData: Project[] = projRes.data;
+  //     setProjects(projectsData);
+
+  //     const instancePromises = projectsData.map((p: Project) =>
+  //       api.get(`/instances?project_id=${p.id}`)
+  //     );
+
+  //     const instanceResults = await Promise.allSettled(instancePromises);
+
+  //     const instancesMap: Record<string, Instance[]> = {};
+  //     projectsData.forEach((p: Project, index: number) => {
+  //       const result = instanceResults[index];
+  //       if (result.status === "fulfilled") {
+  //         instancesMap[p.id] = result.value.data;
+  //       } else {
+  //         console.error(
+  //           `Failed to load instances for project ${p.name}`,
+  //           result.reason
+  //         );
+  //         instancesMap[p.id] = [];
+  //       }
+  //     });
+  //     setInstancesByProject(instancesMap);
+  //   } catch {
+  //     setError("Failed to load data");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }, []);
+
+  // useEffect(() => {
+  //   loadData();
+  // }, [loadData]);
+
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -107,16 +175,6 @@ export default function AdminInstances() {
       setSortDir("asc");
     }
   };
-
-  const sortedInstances = [...instances].sort((a, b) => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    if (sortKey === "is_active") {
-      return (Number(a.is_active) - Number(b.is_active)) * dir;
-    }
-    const aVal = String(a[sortKey]).toLowerCase();
-    const bVal = String(b[sortKey]).toLowerCase();
-    return aVal.localeCompare(bVal) * dir;
-  });
 
   const resetCreateForm = () => {
     setName("");
@@ -242,6 +300,8 @@ export default function AdminInstances() {
       <ArrowUpDown className="h-3.5 w-3.5" />
     </button>
   );
+
+  const allInstances = Object.values(instancesByProject).flat();
 
   return (
     <AppLayout>
@@ -371,88 +431,128 @@ export default function AdminInstances() {
           </div>
         )}
 
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">All Instances</CardTitle>
-            <CardDescription>
-              {instances.length} instance{instances.length !== 1 ? "s" : ""}{" "}
-              across all projects
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {instances.length === 0 ? (
+        {loading && allInstances.length === 0 ? (
+          <p>Loading instances...</p>
+        ) : allInstances.length === 0 ? (
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">All Instances</CardTitle>
+              <CardDescription>
+                No instances found across any project.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <p className="py-8 text-center text-sm text-muted-foreground">
-                No instances found. Create one to get started.
+                Create an instance to get started.
               </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead>
-                      <SortHeader label="Name" sortKeyName="name" />
-                    </TableHead>
-                    <TableHead>
-                      <SortHeader label="URL" sortKeyName="url" />
-                    </TableHead>
-                    <TableHead>
-                      <SortHeader label="Type" sortKeyName="instance_type" />
-                    </TableHead>
-                    <TableHead>
-                      <SortHeader label="Status" sortKeyName="is_active" />
-                    </TableHead>
-                    <TableHead className="text-right text-muted-foreground">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedInstances.map((inst) => (
-                    <TableRow
-                      key={inst.id}
-                      className="border-border hover:bg-muted/50"
-                    >
-                      <TableCell className="font-medium text-foreground">
-                        {inst.name}
-                      </TableCell>
-                      <TableCell>
-                        <a
-                          href={inst.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
-                        >
-                          {inst.url}
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </TableCell>
-                      <TableCell>
-                        <TypeBadge type={inst.instance_type} />
-                      </TableCell>
-                      <TableCell>
-                        <Switch
-                          checked={inst.is_active}
-                          onCheckedChange={() => handleToggleActive(inst)}
-                          disabled={loading}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(inst)}
-                          className="gap-1.5 text-muted-foreground hover:text-foreground"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Edit
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          projects
+            .filter((p) => instancesByProject[p.id]?.length > 0)
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((project) => {
+              const projectInstances = instancesByProject[project.id] || [];
+              const sortedProjectInstances = [...projectInstances].sort(
+                (a, b) => {
+                  const dir = sortDir === "asc" ? 1 : -1;
+                  if (sortKey === "is_active") {
+                    return (Number(a.is_active) - Number(b.is_active)) * dir;
+                  }
+                  const aVal = String(a[sortKey]).toLowerCase();
+                  const bVal = String(b[sortKey]).toLowerCase();
+                  return aVal.localeCompare(bVal) * dir;
+                }
+              );
+
+              return (
+                <Card key={project.id} className="border-border">
+                  <CardHeader>
+                    <CardTitle className="text-foreground">
+                      {project.name}
+                    </CardTitle>
+                    <CardDescription>
+                      {projectInstances.length} instance
+                      {projectInstances.length !== 1 ? "s" : ""} found.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-border hover:bg-transparent">
+                          <TableHead>
+                            <SortHeader label="Name" sortKeyName="name" />
+                          </TableHead>
+                          <TableHead>
+                            <SortHeader label="URL" sortKeyName="url" />
+                          </TableHead>
+                          <TableHead>
+                            <SortHeader
+                              label="Type"
+                              sortKeyName="instance_type"
+                            />
+                          </TableHead>
+                          <TableHead>
+                            <SortHeader
+                              label="Status"
+                              sortKeyName="is_active"
+                            />
+                          </TableHead>
+                          <TableHead className="text-right text-muted-foreground">
+                            Actions
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sortedProjectInstances.map((inst) => (
+                          <TableRow
+                            key={inst.id}
+                            className="border-border hover:bg-muted/50"
+                          >
+                            <TableCell className="font-medium text-foreground">
+                              {inst.name}
+                            </TableCell>
+                            <TableCell>
+                              <a
+                                href={inst.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+                              >
+                                {inst.url}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </TableCell>
+                            <TableCell>
+                              <TypeBadge type={inst.instance_type} />
+                            </TableCell>
+                            <TableCell>
+                              <Switch
+                                checked={inst.is_active}
+                                onCheckedChange={() => handleToggleActive(inst)}
+                                disabled={loading}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(inst)}
+                                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              );
+            })
+        )}
 
         {/* Edit Dialog */}
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
