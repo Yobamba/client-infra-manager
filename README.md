@@ -1,26 +1,107 @@
-# client-infra-manager
+# Client Infrastructure Manager
 
-This project is a full-stack application designed to manage client infrastructure, providing a centralized platform for overseeing clients, projects, and their associated instances. It leverages modern web technologies for the frontend and a robust Python backend for the backend services.
+A full-stack infrastructure management platform for organizing **clients, projects, and Odoo instances**, with strict role-based access control and production safeguards.
 
-## Features
+This system simulates a real-world internal tool used by infrastructure teams to manage multi-client environments safely and efficiently.
 
-- **Client Management**: Track and manage client information.
-- **Project Management**: Organize and oversee projects associated with clients.
-- **Instance Management**: Monitor and manage infrastructure instances.
-- **User Authentication**: Secure user login and role-based access.
+---
 
-## Technologies
+# Overview
 
-- **Frontend**: React, TypeScript, Vite, Tailwind CSS
-- **Backend**: Python, FastAPI
-- **Database**: SQLite, SQLAlchemy
+This application provides a centralized interface to:
 
-## Project Structure
+- Manage clients and their projects
+- Create and control Odoo instances (Production, Staging, Development)
+- Assign users to projects
+- Enforce business rules at the API level
+- Secure access via JWT authentication and role-based permissions
 
-The project is divided into two main parts:
+The system is built using modern frontend technologies with a structured FastAPI backend.
 
-- `app/`: Contains the Python backend services, API routers, database models, and authentication logic.
-- `odoo-manager-frontend/`: Houses the React-based frontend application, including components, pages, API clients, and utility functions.
+---
+
+# Core Features
+
+## Client Management
+
+Create and manage clients that group multiple projects.
+
+## Project Management
+
+Projects belong to a single client and can contain multiple infrastructure instances.
+
+## Odoo Instance Management
+
+Each project can have multiple instances with types:
+
+- PRODUCTION
+- STAGING
+- DEVELOPMENT
+
+### Critical Business Rule
+
+Each project may have **only one active PRODUCTION instance**.
+
+This rule is enforced server-side to prevent conflicts and maintain infrastructure integrity.
+
+## User Authentication & Authorization
+
+- JWT-based authentication
+- Two roles:
+  - ADMIN
+  - STANDARD
+
+### ADMIN Capabilities
+
+- Manage clients, projects, users, and instances
+- Assign and remove users from projects
+- Create/update/delete instances
+
+### STANDARD User Capabilities
+
+- View only assigned projects
+- View instances within assigned projects
+- Cannot access administrative functionality
+
+Authorization is enforced both:
+
+- On the backend (security layer)
+- On the frontend (conditional rendering and route protection)
+
+---
+
+# Tech Stack
+
+## Frontend
+
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn UI
+- Axios
+
+## Backend
+
+- FastAPI
+- SQLAlchemy ORM
+- SQLite (configurable)
+- JWT Authentication
+
+---
+
+<!-- # Architecture
+
+The project follows a clean separation between frontend and backend concerns.
+
+## Backend Structure -->
+
+Key design decisions:
+
+- Many-to-many relationship between Users and Projects
+- Business rules enforced in service layer (not frontend)
+- Clear RESTful endpoint design
+- Validation and error handling via HTTP exceptions
 
 ## Setup and Installation
 
