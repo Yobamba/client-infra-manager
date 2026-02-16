@@ -1,9 +1,56 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import api from "../api/axios";
-import { Link } from "react-router-dom";
 import type { Instance, OdooInstanceType } from "../types/instance";
 import type { Project } from "../types/project";
+import { AppLayout } from "../components/AppLayout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  AlertCircle,
+  ArrowUpDown,
+  CheckCircle2,
+  ExternalLink,
+  Pencil,
+  Plus,
+} from "lucide-react";
+
+type SortKey = "name" | "instance_type" | "is_active" | "url";
+type SortDir = "asc" | "desc";
 
 export default function AdminInstances() {
   const [instances, setInstances] = useState<Instance[]>([]);
@@ -12,17 +59,26 @@ export default function AdminInstances() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Form State
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  // Create dialog state
+  const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [type, setType] = useState<OdooInstanceType>("DEVELOPMENT");
-  const [projectId, setProjectId] = useState<number | "">("");
+  const [projectId, setProjectId] = useState<string>("");
   const [isActive, setIsActive] = useState(true);
 
-  // NEW: Edit mode state
+  // Edit dialog state
+  const [editOpen, setEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editUrl, setEditUrl] = useState("");
+  const [editType, setEditType] = useState<OdooInstanceType>("DEVELOPMENT");
+  const [editIsActive, setEditIsActive] = useState(true);
 
-  const loadInitialData = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -32,37 +88,37 @@ export default function AdminInstances() {
       ]);
       setInstances(instRes.data);
       setProjects(projRes.data);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load admin data");
+    } catch {
+      setError("Failed to load data");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
+    loadData();
+  }, [loadData]);
 
-  // NEW: Function to populate form with instance data for editing
-  // Function to populate form with instance data for editing
-  const handleEdit = (instance: Instance) => {
-    setEditingId(instance.id);
-    setName(instance.name);
-    setUrl(instance.url);
-    setType(instance.instance_type);
-    setIsActive(instance.is_active);
-
-    // Note: We don't set projectId because instances can't change projects
-    // The project_id is preserved on the backend during PATCH
-
-    // Scroll to form
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
   };
 
-  // NEW: Cancel edit mode
-  const handleCancelEdit = () => {
-    setEditingId(null);
+  const sortedInstances = [...instances].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    if (sortKey === "is_active") {
+      return (Number(a.is_active) - Number(b.is_active)) * dir;
+    }
+    const aVal = String(a[sortKey]).toLowerCase();
+    const bVal = String(b[sortKey]).toLowerCase();
+    return aVal.localeCompare(bVal) * dir;
+  });
+
+  const resetCreateForm = () => {
     setName("");
     setUrl("");
     setType("DEVELOPMENT");
@@ -70,97 +126,68 @@ export default function AdminInstances() {
     setIsActive(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (editingId) {
-      await handleUpdateInstance();
-    } else {
-      await handleCreateInstance();
+  const handleCreate = async () => {
+    if (!projectId) {
+      setError("Please select a project");
+      return;
     }
-  };
-
-  const handleCreateInstance = async () => {
-    if (!projectId) return setError("Please select a project");
-
     setLoading(true);
     setError("");
     setSuccess("");
-
     try {
       await api.post("/instances", {
         name,
         url,
         instance_type: type,
         is_active: isActive,
-        project_id: projectId,
+        project_id: Number(projectId),
       });
       setSuccess("Instance created successfully!");
-      handleCancelEdit(); // Reset form
-      loadInitialData();
+      resetCreateForm();
+      setCreateOpen(false);
+      loadData();
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const detail = err.response?.data?.detail;
-        if (typeof detail === "string" && detail.includes("Production")) {
-          setError(
-            "🚨 Conflict: This project already has an active Production instance."
-          );
-        } else if (Array.isArray(detail)) {
-          setError(`Validation Error: ${detail[0].msg}`);
-        } else {
-          setError(detail || "Failed to create instance");
-        }
-      } else {
-        setError("An unexpected error occurred");
-      }
+      handleApiError(err, "create");
     } finally {
       setLoading(false);
     }
   };
 
-  // NEW: Update instance function
-  const handleUpdateInstance = async () => {
-    if (!editingId) return;
+  const handleEdit = (instance: Instance) => {
+    setEditingId(instance.id);
+    setEditName(instance.name);
+    setEditUrl(instance.url);
+    setEditType(instance.instance_type);
+    setEditIsActive(instance.is_active);
+    setEditOpen(true);
+  };
 
+  const handleUpdate = async () => {
+    if (!editingId) return;
     setLoading(true);
     setError("");
     setSuccess("");
-
     try {
       await api.patch(`/instances/${editingId}`, {
-        name,
-        url,
-        instance_type: type,
-        is_active: isActive,
+        name: editName,
+        url: editUrl,
+        instance_type: editType,
+        is_active: editIsActive,
       });
       setSuccess("Instance updated successfully!");
-      handleCancelEdit();
-      loadInitialData();
+      setEditOpen(false);
+      setEditingId(null);
+      loadData();
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const detail = err.response?.data?.detail;
-        if (typeof detail === "string" && detail.includes("Conflict")) {
-          setError(
-            "🚨 Conflict: Cannot activate - another Production instance is already active for this project."
-          );
-        } else if (Array.isArray(detail)) {
-          setError(`Validation Error: ${detail[0].msg}`);
-        } else {
-          setError(detail || "Failed to update instance");
-        }
-      } else {
-        setError("An unexpected error occurred");
-      }
+      handleApiError(err, "update");
     } finally {
       setLoading(false);
     }
   };
 
-  // NEW: Toggle active status quickly
   const handleToggleActive = async (instance: Instance) => {
     setLoading(true);
     setError("");
-
     try {
       await api.patch(`/instances/${instance.id}`, {
         is_active: !instance.is_active,
@@ -168,7 +195,7 @@ export default function AdminInstances() {
       setSuccess(
         `Instance ${!instance.is_active ? "activated" : "deactivated"} successfully!`
       );
-      loadInitialData();
+      loadData();
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const detail = err.response?.data?.detail;
@@ -179,206 +206,334 @@ export default function AdminInstances() {
     }
   };
 
+  const handleApiError = (err: unknown, action: string) => {
+    if (axios.isAxiosError(err)) {
+      const detail = err.response?.data?.detail;
+      if (typeof detail === "string" && detail.includes("Production")) {
+        setError(
+          "Conflict: This project already has an active Production instance."
+        );
+      } else if (typeof detail === "string" && detail.includes("Conflict")) {
+        setError(
+          "Conflict: Cannot activate - another Production instance is already active for this project."
+        );
+      } else if (Array.isArray(detail)) {
+        setError(`Validation Error: ${detail[0].msg}`);
+      } else {
+        setError(detail || `Failed to ${action} instance`);
+      }
+    } else {
+      setError("An unexpected error occurred");
+    }
+  };
+
+  const SortHeader = ({
+    label,
+    sortKeyName,
+  }: {
+    label: string;
+    sortKeyName: SortKey;
+  }) => (
+    <button
+      onClick={() => handleSort(sortKeyName)}
+      className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+    >
+      {label}
+      <ArrowUpDown className="h-3.5 w-3.5" />
+    </button>
+  );
+
   return (
-    <div style={{ padding: "2rem", maxWidth: "800px" }}>
-      <nav style={{ marginBottom: "2rem", display: "flex", gap: "10px" }}>
-        <Link to="/admin">General Admin</Link>
-        <Link to="/admin/instances">Manage Instances</Link>
-      </nav>
-      <h1>Infrastructure Management</h1>
-
-      {error && (
-        <p
-          style={{ color: "red", backgroundColor: "#ffebee", padding: "10px" }}
-        >
-          {error}
-        </p>
-      )}
-      {success && (
-        <p
-          style={{
-            color: "green",
-            backgroundColor: "#e8f5e9",
-            padding: "10px",
-          }}
-        >
-          {success}
-        </p>
-      )}
-
-      <section
-        style={{
-          marginBottom: "2rem",
-          border: "1px solid #ccc",
-          padding: "1.5rem",
-          borderRadius: "8px",
-          backgroundColor: editingId ? "#fff3cd" : "white",
-        }}
-      >
-        <h2>{editingId ? "Edit Instance" : "Create New Instance"}</h2>
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: "flex", flexDirection: "column", gap: "10px" }}
-        >
-          <input
-            placeholder="Instance Name (e.g. Odoo Prod)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-          <input
-            placeholder="URL (e.g. https://prod.odoo.com)"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            required
-          />
-
-          <label>Instance Type:</label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value as OdooInstanceType)}
-          >
-            <option value="PRODUCTION">Production</option>
-            <option value="STAGING">Staging</option>
-            <option value="DEVELOPMENT">Development</option>
-          </select>
-
-          <label>
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-            />{" "}
-            Active
-          </label>
-
-          {!editingId && (
-            <>
-              <label>Assign to Project:</label>
-              <select
-                value={projectId}
-                onChange={(e) => setProjectId(Number(e.target.value))}
-                required
-              >
-                <option value="">Select Project</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-
-          <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-            <button type="submit" disabled={loading}>
-              {loading
-                ? editingId
-                  ? "Updating..."
-                  : "Creating..."
-                : editingId
-                  ? "Update Instance"
-                  : "Create Instance"}
-            </button>
-            {editingId && (
-              <button
-                type="button"
-                onClick={handleCancelEdit}
-                style={{ backgroundColor: "#666" }}
-              >
-                Cancel
-              </button>
-            )}
+    <AppLayout>
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Infrastructure Management
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Manage all Odoo instances across projects
+            </p>
           </div>
-        </form>
-      </section>
 
-      <section>
-        <h2>Existing Instances</h2>
-        {instances.length === 0 ? (
-          <p>No instances found.</p>
-        ) : (
-          <div style={{ display: "grid", gap: "15px" }}>
-            {instances.map((inst) => (
-              <div
-                key={inst.id}
-                style={{
-                  padding: "1rem",
-                  border: "1px solid #eee",
-                  borderRadius: "5px",
-                  backgroundColor: editingId === inst.id ? "#fff3cd" : "white",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "start",
-                  }}
-                >
-                  <div>
-                    <strong>{inst.name}</strong>
-                    <span
-                      style={{
-                        marginLeft: "10px",
-                        fontSize: "0.8rem",
-                        padding: "2px 6px",
-                        backgroundColor:
-                          inst.instance_type === "PRODUCTION"
-                            ? "#ffd700"
-                            : "#eee",
-                      }}
-                    >
-                      {inst.instance_type}
-                    </span>
-                    <p style={{ margin: "5px 0" }}>
-                      URL:{" "}
-                      <a href={inst.url} target="_blank" rel="noreferrer">
-                        {inst.url}
-                      </a>
-                    </p>
-                    <p style={{ fontSize: "0.9rem", color: "#666" }}>
-                      Status: {inst.is_active ? "✅ Active" : "❌ Inactive"}
-                    </p>
-                  </div>
-
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button
-                      onClick={() => handleEdit(inst)}
-                      style={{
-                        padding: "5px 10px",
-                        fontSize: "0.85rem",
-                        backgroundColor: "#007bff",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleToggleActive(inst)}
-                      style={{
-                        padding: "5px 10px",
-                        fontSize: "0.85rem",
-                        backgroundColor: inst.is_active ? "#dc3545" : "#28a745",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                      }}
-                      disabled={loading}
-                    >
-                      {inst.is_active ? "Deactivate" : "Activate"}
-                    </button>
-                  </div>
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                Create Instance
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="border-border bg-card">
+              <DialogHeader>
+                <DialogTitle className="text-foreground">
+                  Create New Instance
+                </DialogTitle>
+                <DialogDescription>
+                  Add a new Odoo instance to a project.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-4 py-2">
+                <div className="flex flex-col gap-2">
+                  <Label className="text-foreground">Instance Name</Label>
+                  <Input
+                    placeholder="e.g. Odoo Prod"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="bg-background"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-foreground">URL</Label>
+                  <Input
+                    placeholder="e.g. https://prod.odoo.com"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    className="bg-background"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-foreground">Instance Type</Label>
+                  <Select
+                    value={type}
+                    onValueChange={(v) => setType(v as OdooInstanceType)}
+                  >
+                    <SelectTrigger className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PRODUCTION">Production</SelectItem>
+                      <SelectItem value="STAGING">Staging</SelectItem>
+                      <SelectItem value="DEVELOPMENT">Development</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-foreground">Project</Label>
+                  <Select value={projectId} onValueChange={setProjectId}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Select a project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={isActive}
+                    onCheckedChange={setIsActive}
+                    id="create-active"
+                  />
+                  <Label htmlFor="create-active" className="text-foreground">
+                    Active
+                  </Label>
                 </div>
               </div>
-            ))}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreate} disabled={loading}>
+                  {loading ? "Creating..." : "Create Instance"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+            <button
+              onClick={() => setError("")}
+              className="ml-auto text-destructive/70 hover:text-destructive"
+            >
+              Dismiss
+            </button>
           </div>
         )}
-      </section>
-    </div>
+
+        {success && (
+          <div className="flex items-center gap-2 rounded-md bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            {success}
+            <button
+              onClick={() => setSuccess("")}
+              className="ml-auto text-emerald-600/70 hover:text-emerald-600"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="text-foreground">All Instances</CardTitle>
+            <CardDescription>
+              {instances.length} instance{instances.length !== 1 ? "s" : ""}{" "}
+              across all projects
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {instances.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No instances found. Create one to get started.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead>
+                      <SortHeader label="Name" sortKeyName="name" />
+                    </TableHead>
+                    <TableHead>
+                      <SortHeader label="URL" sortKeyName="url" />
+                    </TableHead>
+                    <TableHead>
+                      <SortHeader label="Type" sortKeyName="instance_type" />
+                    </TableHead>
+                    <TableHead>
+                      <SortHeader label="Status" sortKeyName="is_active" />
+                    </TableHead>
+                    <TableHead className="text-right text-muted-foreground">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedInstances.map((inst) => (
+                    <TableRow
+                      key={inst.id}
+                      className="border-border hover:bg-muted/50"
+                    >
+                      <TableCell className="font-medium text-foreground">
+                        {inst.name}
+                      </TableCell>
+                      <TableCell>
+                        <a
+                          href={inst.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+                        >
+                          {inst.url}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </TableCell>
+                      <TableCell>
+                        <TypeBadge type={inst.instance_type} />
+                      </TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={inst.is_active}
+                          onCheckedChange={() => handleToggleActive(inst)}
+                          disabled={loading}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(inst)}
+                          className="gap-1.5 text-muted-foreground hover:text-foreground"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="border-border bg-card">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">
+                Edit Instance
+              </DialogTitle>
+              <DialogDescription>
+                Update the instance details below.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-4 py-2">
+              <div className="flex flex-col gap-2">
+                <Label className="text-foreground">Instance Name</Label>
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="bg-background"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-foreground">URL</Label>
+                <Input
+                  value={editUrl}
+                  onChange={(e) => setEditUrl(e.target.value)}
+                  className="bg-background"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label className="text-foreground">Instance Type</Label>
+                <Select
+                  value={editType}
+                  onValueChange={(v) => setEditType(v as OdooInstanceType)}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PRODUCTION">Production</SelectItem>
+                    <SelectItem value="STAGING">Staging</SelectItem>
+                    <SelectItem value="DEVELOPMENT">Development</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={editIsActive}
+                  onCheckedChange={setEditIsActive}
+                  id="edit-active"
+                />
+                <Label htmlFor="edit-active" className="text-foreground">
+                  Active
+                </Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdate} disabled={loading}>
+                {loading ? "Updating..." : "Update Instance"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </AppLayout>
+  );
+}
+
+function TypeBadge({ type }: { type: OdooInstanceType }) {
+  const config = {
+    PRODUCTION: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+    STAGING: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    DEVELOPMENT: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  };
+
+  return (
+    <Badge variant="outline" className={`${config[type]} font-medium`}>
+      {type.charAt(0) + type.slice(1).toLowerCase()}
+    </Badge>
   );
 }

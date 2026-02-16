@@ -1,11 +1,44 @@
 import { useState, useEffect, useCallback } from "react";
-
 import axios from "axios";
 import api from "../api/axios";
-import { Link } from "react-router-dom";
 import type { User, UserWithProjects } from "../types/user";
 import type { Project } from "../types/project";
 import type { Client } from "../types/client";
+import { AppLayout } from "../components/AppLayout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Plus,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 
 export default function Admin() {
   const [error, setError] = useState("");
@@ -16,33 +49,25 @@ export default function Admin() {
     UserWithProjects[]
   >([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | "">("");
-  const [selectedProjectId, setSelectedProjectId] = useState<number | "">("");
+  const [clients, setClients] = useState<Client[]>([]);
 
-  // User Creation State
+  // User creation
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
   const [newUserRole, setNewUserRole] = useState<"ADMIN" | "STANDARD">(
     "STANDARD"
   );
 
-  // Client State
+  // Client creation
   const [clientName, setClientName] = useState("");
 
-  // Project State
+  // Project creation
   const [projectName, setProjectName] = useState("");
-  const [selectedClientId, setSelectedClientId] = useState<number | "">("");
-  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
 
-  // 1. Reusable fetcher for manual refreshes (like after creating a client)
-  const refreshClients = async () => {
-    try {
-      const res = await api.get("/clients");
-      setClients(res.data);
-    } catch {
-      setError("Failed to refresh clients list");
-    }
-  };
+  // Assignment
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
 
   const loadData = useCallback(async () => {
     try {
@@ -53,7 +78,6 @@ export default function Admin() {
           api.get("/users/with-projects"),
           api.get("/projects"),
         ]);
-
       setClients(clientsRes.data);
       setUsers(usersRes.data);
       setUsersWithProjects(usersWithProjectsRes.data);
@@ -65,7 +89,6 @@ export default function Admin() {
 
   useEffect(() => {
     let isMounted = true;
-
     async function initLoad() {
       try {
         const [clientsRes, usersRes, usersWithProjectsRes, projectsRes] =
@@ -75,7 +98,6 @@ export default function Admin() {
             api.get("/users/with-projects"),
             api.get("/projects"),
           ]);
-
         if (isMounted) {
           setClients(clientsRes.data);
           setUsers(usersRes.data);
@@ -86,67 +108,45 @@ export default function Admin() {
         if (isMounted) setError("Failed to load admin data");
       }
     }
-
     initLoad();
-
     return () => {
       isMounted = false;
     };
-  }, []); // No dependencies needed because it's self-contained
+  }, []);
+
+  const clearMessages = () => {
+    setError("");
+    setSuccess("");
+  };
 
   const handleCreateUser = async () => {
+    clearMessages();
     try {
       await api.post("/users", {
         email: newUserEmail,
         password: newUserPassword,
         role: newUserRole,
       });
-
       setSuccess("User created successfully!");
       setNewUserEmail("");
       setNewUserPassword("");
       loadData();
     } catch (err) {
-      console.error(err);
-      setError("Failed to create user");
-    }
-  };
-
-  const handleAssignUser = async () => {
-    if (!selectedUserId || !selectedProjectId) {
-      setError("Select both user and project");
-      return;
-    }
-
-    try {
-      await api.post(`/projects/${selectedProjectId}/assign/${selectedUserId}`);
-
-      setSuccess("User assigned successfully!");
-      loadData();
-    } catch (err) {
-      console.error(err);
-      setError("Failed to assign user");
-    }
-  };
-
-  const handleRemoveUser = async (projectId: number, userId: number) => {
-    try {
-      await api.delete(`/projects/${projectId}/assign/${userId}`);
-      setSuccess("User removed from project");
-      loadData();
-    } catch (err) {
-      console.error(err);
-      setError("Failed to remove user");
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail || "Failed to create user");
+      } else {
+        setError("Failed to create user");
+      }
     }
   };
 
   const handleCreateClient = async () => {
+    clearMessages();
     try {
       await api.post(`/clients?name=${clientName}`);
       setSuccess("Client created successfully!");
       setClientName("");
-      setError("");
-      refreshClients();
+      loadData();
     } catch (err) {
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.detail || "Failed to create client");
@@ -155,6 +155,7 @@ export default function Admin() {
   };
 
   const handleCreateProject = async () => {
+    clearMessages();
     if (!selectedClientId) {
       setError("Please select a client for the project");
       return;
@@ -162,16 +163,14 @@ export default function Admin() {
     try {
       await api.post("/projects", {
         name: projectName,
-        client_id: selectedClientId,
+        client_id: Number(selectedClientId),
       });
       setSuccess("Project created successfully!");
       setProjectName("");
-      setError("");
+      loadData();
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const detail = err.response?.data?.detail;
-
-        // Check if it's a validation array (422) or a simple string (400/404)
         if (Array.isArray(detail)) {
           setError(`Validation Error: ${detail[0].msg}`);
         } else {
@@ -183,172 +182,411 @@ export default function Admin() {
     }
   };
 
+  const handleAssignUser = async () => {
+    clearMessages();
+    if (!selectedUserId || !selectedProjectId) {
+      setError("Select both user and project");
+      return;
+    }
+    try {
+      await api.post(`/projects/${selectedProjectId}/assign/${selectedUserId}`);
+      setSuccess("User assigned successfully!");
+      loadData();
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail || "Failed to assign user");
+      } else {
+        setError("Failed to assign user");
+      }
+    }
+  };
+
+  const handleRemoveUser = async (projectId: number, userId: number) => {
+    clearMessages();
+    try {
+      await api.delete(`/projects/${projectId}/assign/${userId}`);
+      setSuccess("User removed from project");
+      loadData();
+    } catch {
+      setError("Failed to remove user");
+    }
+  };
+
   return (
-    <div style={{ padding: "2rem", maxWidth: "800px" }}>
-      <nav style={{ marginBottom: "2rem", display: "flex", gap: "10px" }}>
-        <Link to="/admin">General Admin</Link>
-        <Link to="/admin/instances">Manage Instances</Link>
-      </nav>
-      <h1>Admin Panel</h1>
+    <AppLayout>
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Admin Panel
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Manage users, clients, projects, and assignments
+          </p>
+        </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      {success && <p style={{ color: "green" }}>{success}</p>}
+        {error && (
+          <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+            <button
+              onClick={() => setError("")}
+              className="ml-auto text-destructive/70 hover:text-destructive"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
-      {/* CREATE USER */}
-      <section style={{ marginBottom: "2rem" }}>
-        <h2>Create User</h2>
+        {success && (
+          <div className="flex items-center gap-2 rounded-md bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            {success}
+            <button
+              onClick={() => setSuccess("")}
+              className="ml-auto text-emerald-600/70 hover:text-emerald-600"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
-        <input
-          placeholder="Email"
-          value={newUserEmail}
-          onChange={(e) => setNewUserEmail(e.target.value)}
-        />
+        <Tabs defaultValue="create" className="w-full">
+          <TabsList className="w-full justify-start bg-muted">
+            <TabsTrigger value="create">Create</TabsTrigger>
+            <TabsTrigger value="assign">Assign Users</TabsTrigger>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+          </TabsList>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={newUserPassword}
-          onChange={(e) => setNewUserPassword(e.target.value)}
-        />
+          {/* CREATE TAB */}
+          <TabsContent value="create" className="mt-4">
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Create User */}
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-foreground">
+                    <UserPlus className="h-4 w-4 text-primary" />
+                    Create User
+                  </CardTitle>
+                  <CardDescription>Add a new user account</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-foreground">Email</Label>
+                    <Input
+                      placeholder="user@example.com"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-foreground">Password</Label>
+                    <Input
+                      type="password"
+                      placeholder="Password"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-foreground">Role</Label>
+                    <Select
+                      value={newUserRole}
+                      onValueChange={(v) =>
+                        setNewUserRole(v as "ADMIN" | "STANDARD")
+                      }
+                    >
+                      <SelectTrigger className="bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="STANDARD">Standard</SelectItem>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={handleCreateUser} className="mt-2 gap-1.5">
+                    <Plus className="h-4 w-4" />
+                    Create User
+                  </Button>
+                </CardContent>
+              </Card>
 
-        <select
-          value={newUserRole}
-          onChange={(e) =>
-            setNewUserRole(e.target.value as "ADMIN" | "STANDARD")
-          }
-        >
-          <option value="STANDARD">STANDARD</option>
-          <option value="ADMIN">ADMIN</option>
-        </select>
+              {/* Create Client */}
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-foreground">
+                    <Plus className="h-4 w-4 text-primary" />
+                    Create Client
+                  </CardTitle>
+                  <CardDescription>
+                    Add a new client organization
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-foreground">Client Name</Label>
+                    <Input
+                      placeholder="Client name"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
+                  <Button onClick={handleCreateClient} className="mt-2 gap-1.5">
+                    <Plus className="h-4 w-4" />
+                    Create Client
+                  </Button>
+                </CardContent>
+              </Card>
 
-        <button onClick={handleCreateUser}>Create User</button>
-      </section>
+              {/* Create Project */}
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-foreground">
+                    <Plus className="h-4 w-4 text-primary" />
+                    Create Project
+                  </CardTitle>
+                  <CardDescription>
+                    Add a project under a client
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-foreground">Project Name</Label>
+                    <Input
+                      placeholder="Project name"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-foreground">Client</Label>
+                    <Select
+                      value={selectedClientId}
+                      onValueChange={setSelectedClientId}
+                    >
+                      <SelectTrigger className="bg-background">
+                        <SelectValue placeholder="Select client" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={handleCreateProject}
+                    className="mt-2 gap-1.5"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create Project
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
 
-      {/* CREATE CLIENT */}
-      <section style={{ marginBottom: "2rem" }}>
-        <h2>Create Client</h2>
+          {/* ASSIGN TAB */}
+          <TabsContent value="assign" className="mt-4">
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground">
+                  Assign User to Project
+                </CardTitle>
+                <CardDescription>
+                  Link a user to a project so they can access it
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <Label className="text-foreground">User</Label>
+                    <Select
+                      value={selectedUserId}
+                      onValueChange={setSelectedUserId}
+                    >
+                      <SelectTrigger className="bg-background">
+                        <SelectValue placeholder="Select user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((u) => (
+                          <SelectItem key={u.id} value={String(u.id)}>
+                            {u.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <Label className="text-foreground">Project</Label>
+                    <Select
+                      value={selectedProjectId}
+                      onValueChange={setSelectedProjectId}
+                    >
+                      <SelectTrigger className="bg-background">
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projects.map((p) => (
+                          <SelectItem key={p.id} value={String(p.id)}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={handleAssignUser} className="gap-1.5">
+                    <UserPlus className="h-4 w-4" />
+                    Assign
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <input
-          value={clientName}
-          placeholder="Client Name"
-          onChange={(e) => setClientName(e.target.value)}
-        />
+          {/* OVERVIEW TAB */}
+          <TabsContent value="overview" className="mt-4">
+            <div className="flex flex-col gap-6">
+              {/* Users table */}
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="text-foreground">Users</CardTitle>
+                  <CardDescription>
+                    {users.length} registered user
+                    {users.length !== 1 ? "s" : ""}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-transparent">
+                        <TableHead className="text-muted-foreground">
+                          Email
+                        </TableHead>
+                        <TableHead className="text-muted-foreground">
+                          Role
+                        </TableHead>
+                        <TableHead className="text-muted-foreground">
+                          Assigned Projects
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {usersWithProjects.map((u) => (
+                        <TableRow
+                          key={u.id}
+                          className="border-border hover:bg-muted/50"
+                        >
+                          <TableCell className="font-medium text-foreground">
+                            {u.email}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={
+                                u.role === "ADMIN"
+                                  ? "border-amber-500/20 bg-amber-500/10 text-amber-600"
+                                  : "border-border bg-muted text-muted-foreground"
+                              }
+                            >
+                              {u.role}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {u.projects.length === 0
+                              ? "None"
+                              : u.projects.map((p) => p.name).join(", ")}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
 
-        <button onClick={handleCreateClient}>Create Client</button>
-      </section>
-
-      {/* CREATE PROJECT */}
-      <section style={{ marginBottom: "2rem" }}>
-        <h2>Create Project</h2>
-
-        <input
-          value={projectName}
-          placeholder="Project Name"
-          onChange={(e) => setProjectName(e.target.value)}
-        />
-
-        <select
-          value={selectedClientId}
-          onChange={(e) => setSelectedClientId(Number(e.target.value))}
-        >
-          <option value="">Select Client</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-
-        <button onClick={handleCreateProject}>Create Project</button>
-      </section>
-
-      {/* ASSIGN USER */}
-      <section style={{ marginBottom: "2rem" }}>
-        <h2>Assign User to Project</h2>
-
-        <select
-          value={selectedUserId}
-          onChange={(e) => setSelectedUserId(Number(e.target.value))}
-        >
-          <option value="">Select User</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.email}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={selectedProjectId}
-          onChange={(e) => setSelectedProjectId(Number(e.target.value))}
-        >
-          <option value="">Select Project</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-
-        <button onClick={handleAssignUser}>Assign</button>
-      </section>
-
-      {/* OVERVIEW */}
-      <section>
-        <h2>Existing Users</h2>
-        <ul>
-          {users.map((u) => (
-            <li key={u.id}>
-              {u.email} ({u.role})
-            </li>
-          ))}
-        </ul>
-
-        <h2>Users With Projects</h2>
-        <ul>
-          {usersWithProjects.map((user) => (
-            <li key={user.id}>
-              <strong>{user.email}</strong> ({user.role})
-              <ul>
-                {user.projects.length > 0 ? (
-                  user.projects.map((project) => (
-                    <li key={project.id}>{project.name}</li>
-                  ))
-                ) : (
-                  <li>No projects assigned</li>
-                )}
-              </ul>
-            </li>
-          ))}
-        </ul>
-
-        <h2>Existing Projects</h2>
-        <ul>
-          {projects.map((p) => (
-            <li key={p.id}>
-              <strong>{p.name}</strong>
-
-              <ul>
-                {p.users.length > 0 ? (
-                  p.users.map((u) => (
-                    <li key={u.id}>
-                      {u.email}
-                      <button
-                        style={{ marginLeft: "10px" }}
-                        onClick={() => handleRemoveUser(p.id, u.id)}
-                      >
-                        Remove
-                      </button>
-                    </li>
-                  ))
-                ) : (
-                  <li>No users assigned</li>
-                )}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
+              {/* Projects table */}
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="text-foreground">Projects</CardTitle>
+                  <CardDescription>
+                    {projects.length} project{projects.length !== 1 ? "s" : ""}{" "}
+                    with assigned users
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-transparent">
+                        <TableHead className="text-muted-foreground">
+                          Project
+                        </TableHead>
+                        <TableHead className="text-muted-foreground">
+                          Assigned Users
+                        </TableHead>
+                        <TableHead className="text-right text-muted-foreground">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {projects.map((p) => (
+                        <TableRow
+                          key={p.id}
+                          className="border-border hover:bg-muted/50"
+                        >
+                          <TableCell className="font-medium text-foreground">
+                            {p.name}
+                          </TableCell>
+                          <TableCell>
+                            {p.users.length === 0 ? (
+                              <span className="text-sm text-muted-foreground">
+                                No users assigned
+                              </span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {p.users.map((u) => (
+                                  <Badge
+                                    key={u.id}
+                                    variant="secondary"
+                                    className="gap-1 bg-secondary text-secondary-foreground"
+                                  >
+                                    {u.email}
+                                    <button
+                                      onClick={() =>
+                                        handleRemoveUser(p.id, u.id)
+                                      }
+                                      className="ml-0.5 text-muted-foreground hover:text-destructive"
+                                      aria-label={`Remove ${u.email} from ${p.name}`}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-xs text-muted-foreground">
+                              {p.users.length} user
+                              {p.users.length !== 1 ? "s" : ""}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </AppLayout>
   );
 }
