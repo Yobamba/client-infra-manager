@@ -25,6 +25,27 @@ def get_projects(
         .all()
     )
     
+
+@router.delete("/{project_id}")
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_admin = Depends(get_current_admin)
+):
+    project = db.query(Project).filter(Project.id == project_id).first()
+
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+
+    db.delete(project)
+    db.commit()
+
+    return {"message": "Project deleted successfully"}
+
+
 @router.delete("/{project_id}/assign/{user_id}")
 def remove_user_from_project(
     project_id: int,
