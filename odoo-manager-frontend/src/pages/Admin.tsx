@@ -33,8 +33,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertCircle,
   CheckCircle2,
+  FileEdit,
   Plus,
   Trash2,
   UserPlus,
@@ -68,6 +77,11 @@ export default function Admin() {
   // Assignment
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+
+  // Project editing
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editedProjectName, setEditedProjectName] = useState("");
+  const [editedProjectClientId, setEditedProjectClientId] = useState<string>("");
 
   const loadData = useCallback(async () => {
     try {
@@ -112,7 +126,7 @@ export default function Admin() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loadData]);
 
   const clearMessages = () => {
     setError("");
@@ -209,6 +223,40 @@ export default function Admin() {
       loadData();
     } catch {
       setError("Failed to remove user");
+    }
+  };
+
+  const handleDeleteProject = async (projectId: number) => {
+    clearMessages();
+    if (window.confirm("Are you sure you want to delete this project?")) {
+      try {
+        await api.delete(`/projects/${projectId}`);
+        setSuccess("Project deleted successfully");
+        loadData();
+      } catch {
+        setError("Failed to delete project");
+      }
+    }
+  };
+
+  const handleUpdateProject = async () => {
+    if (!editingProject) return;
+    clearMessages();
+    try {
+      await api.patch(`/projects/${editingProject.id}`, {
+        name: editedProjectName,
+        client_id: Number(editedProjectClientId),
+      });
+      setSuccess("Project updated successfully!");
+      setEditingProject(null);
+      loadData();
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const detail = err.response?.data?.detail;
+        setError(detail || "Failed to update project");
+      } else {
+        setError("An unexpected error occurred");
+      }
     }
   };
 
@@ -572,10 +620,25 @@ export default function Admin() {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-xs text-muted-foreground">
-                              {p.users.length} user
-                              {p.users.length !== 1 ? "s" : ""}
-                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingProject(p);
+                                setEditedProjectName(p.name);
+                                setEditedProjectClientId(String(p.client_id));
+                              }}
+                            >
+                              <FileEdit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteProject(p.id)}
+                              className="text-destructive hover:text-destructive/80"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -587,6 +650,58 @@ export default function Admin() {
           </TabsContent>
         </Tabs>
       </div>
+      {editingProject && (
+        <Dialog
+          open={!!editingProject}
+          onOpenChange={(isOpen) => !isOpen && setEditingProject(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Project</DialogTitle>
+              <DialogDescription>
+                Update the details for project "{editingProject.name}".
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-4 py-4">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-foreground">Project Name</Label>
+                <Input
+                  value={editedProjectName}
+                  onChange={(e) => setEditedProjectName(e.target.value)}
+                  className="bg-background"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-foreground">Client</Label>
+                <Select
+                  value={editedProjectClientId}
+                  onValueChange={setEditedProjectClientId}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEditingProject(null)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateProject}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </AppLayout>
   );
 }
