@@ -219,9 +219,7 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.map((row, idx) => {
-                      const showClient =
-                        idx === 0 || rows[idx - 1].clientId !== row.clientId;
+                    {rows.map((row) => {
                       return (
                         <TableRow
                           key={row.project.id}
@@ -229,7 +227,7 @@ export default function Dashboard() {
                         >
                           {user?.role === "ADMIN" && (
                             <TableCell className="font-medium text-foreground">
-                              {showClient ? row.clientName : ""}
+                              {row.clientName}
                             </TableCell>
                           )}
                           <TableCell>
