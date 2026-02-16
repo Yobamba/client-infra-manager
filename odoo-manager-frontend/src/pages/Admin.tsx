@@ -808,6 +808,9 @@ export default function Admin() {
                         <TableHead className="text-muted-foreground">
                           Client Name
                         </TableHead>
+                        <TableHead className="text-muted-foreground">
+                          Projects
+                        </TableHead>
                         <TableHead className="text-right text-muted-foreground">
                           Actions
                         </TableHead>
@@ -821,6 +824,23 @@ export default function Admin() {
                         >
                           <TableCell className="font-medium text-foreground">
                             {c.name}
+                          </TableCell>
+                          <TableCell>
+                            {projects.filter(p => p.client_id === c.id).length === 0 ? (
+                              <span className="text-sm text-muted-foreground">
+                                No projects
+                              </span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {projects
+                                  .filter(p => p.client_id === c.id)
+                                  .map(p => (
+                                    <Badge key={p.id} variant="secondary" className="gap-1 bg-secondary text-secondary-foreground">
+                                      {p.name}
+                                    </Badge>
+                                  ))}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
