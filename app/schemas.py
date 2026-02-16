@@ -19,7 +19,13 @@ class InstanceUpdate(BaseModel):
 class ProjectCreate(BaseModel):
     name: str
     client_id: int
-    
+
+
+class ProjectUpdate(BaseModel):
+    name: str | None = None
+    client_id: int | None = None
+
+
 class UserRole(str, Enum):
     ADMIN = "ADMIN"
     STANDARD = "STANDARD"

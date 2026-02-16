@@ -154,3 +154,31 @@ def assign_user_to_project(
     db.commit()
 
     return {"message": "User assigned to project"}
+
+@router.patch("/{project_id}", response_model=ProjectResponse)
+def update_project(
+    project_id: int,
+    project_data: schemas.ProjectUpdate,
+    db: Session = Depends(get_db),
+    current_admin=Depends(get_current_admin),
+):
+    project = db.query(Project).filter(Project.id == project_id).first()
+
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+        )
+
+    if project_data.client_id is not None:
+        client = db.query(Client).filter(Client.id == project_data.client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+        project.client_id = project_data.client_id
+
+    if project_data.name is not None:
+        project.name = project_data.name
+
+    db.commit()
+    db.refresh(project)
+
+    return project
