@@ -88,17 +88,23 @@ export default function ProjectDetails() {
       try {
         const [instRes, projRes] = await Promise.all([
           api.get(`/instances?project_id=${id}`),
-          api.get(`/projects`),
+          api.get(`/projects/${id}`),
         ]);
         if (isMounted) {
           setInstances(instRes.data);
-          const proj = projRes.data.find(
-            (p: { id: number }) => p.id === Number(id)
-          );
-          if (proj) setProjectName(proj.name);
         }
-      } catch {
-        if (isMounted) setError("Failed to load instances");
+
+        setProjectName(projRes.data.name);
+      } catch (err) {
+        if (axios.isAxiosError(err)) {
+          if (err.response?.status === 404) {
+            setError("Project not found.");
+          } else if (err.response?.status === 403) {
+            setError("You are not authorized to access this project.");
+          } else {
+            setError("Failed to load project.");
+          }
+        }
       }
     };
 
