@@ -3,7 +3,7 @@ import { useAuth } from "../context/useAuth";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  adminOnly?: boolean; // New optional prop
+  adminOnly?: boolean;
 }
 
 export const ProtectedRoute = ({

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import api from "../api/axios";
 import type { User } from "../types/user";
-import { AuthContext } from "./AuthContext.ts"; // Import it now
+import { AuthContext } from "./AuthContext.ts";
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -16,11 +16,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Use your existing /me endpoint to verify the token
       const response = await api.get("/me");
       setUser(response.data);
     } catch (error) {
-      localStorage.removeItem("token"); // Token is invalid/expired
+      localStorage.removeItem("token");
       console.error(error);
       setUser(null);
     } finally {
@@ -35,7 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     // 1. Create Form Data instead of a JSON object
     const params = new URLSearchParams();
-    params.append("username", email); // OAuth2 standard uses 'username'
+    params.append("username", email);
     params.append("password", password);
 
     // 2. Send with the correct header
