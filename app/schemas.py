@@ -15,7 +15,10 @@ class InstanceUpdate(BaseModel):
     instance_type: OdooInstanceType | None = None
     is_active: bool | None = None
     project_id: int | None = None
-    
+
+class ClientUpdate(BaseModel):
+    name: str | None = None
+
 class ProjectCreate(BaseModel):
     name: str
     client_id: int

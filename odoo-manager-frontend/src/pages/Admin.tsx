@@ -81,13 +81,20 @@ export default function Admin() {
   // Project editing
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editedProjectName, setEditedProjectName] = useState("");
-  const [editedProjectClientId, setEditedProjectClientId] = useState<string>("");
+  const [editedProjectClientId, setEditedProjectClientId] =
+    useState<string>("");
 
   // User editing
   const [editingUser, setEditingUser] = useState<UserWithProjects | null>(null);
   const [editedUserEmail, setEditedUserEmail] = useState("");
   const [editedUserPassword, setEditedUserPassword] = useState("");
-  const [editedUserRole, setEditedUserRole] = useState<"ADMIN" | "STANDARD">("STANDARD");
+  const [editedUserRole, setEditedUserRole] = useState<"ADMIN" | "STANDARD">(
+    "STANDARD"
+  );
+
+  // Client editing
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [editedClientName, setEditedClientName] = useState("");
 
   const loadData = useCallback(async () => {
     try {
@@ -269,17 +276,17 @@ export default function Admin() {
   const handleDeleteUser = async (userId: number) => {
     clearMessages();
     if (window.confirm("Are you sure you want to delete this user?")) {
-        try {
-            await api.delete(`/users/${userId}`);
-            setSuccess("User deleted successfully");
-            loadData();
-        } catch (err) {
-            if (axios.isAxiosError(err)) {
-                setError(err.response?.data?.detail || "Failed to delete user");
-            } else {
-                setError("Failed to delete user");
-            }
+      try {
+        await api.delete(`/users/${userId}`);
+        setSuccess("User deleted successfully");
+        loadData();
+      } catch (err) {
+        if (axios.isAxiosError(err)) {
+          setError(err.response?.data?.detail || "Failed to delete user");
+        } else {
+          setError("Failed to delete user");
         }
+      }
     }
   };
 
@@ -287,33 +294,37 @@ export default function Admin() {
     if (!editingUser) return;
     clearMessages();
 
-    const payload: { email?: string; password?: string; role?: "ADMIN" | "STANDARD" } = {};
+    const payload: {
+      email?: string;
+      password?: string;
+      role?: "ADMIN" | "STANDARD";
+    } = {};
     if (editedUserEmail !== editingUser.email) {
-        payload.email = editedUserEmail;
+      payload.email = editedUserEmail;
     }
     if (editedUserPassword) {
-        payload.password = editedUserPassword;
+      payload.password = editedUserPassword;
     }
     if (editedUserRole !== editingUser.role) {
-        payload.role = editedUserRole;
+      payload.role = editedUserRole;
     }
 
     if (Object.keys(payload).length === 0) {
-        setEditingUser(null);
-        return;
+      setEditingUser(null);
+      return;
     }
 
     try {
-        await api.patch(`/users/${editingUser.id}`, payload);
-        setSuccess("User updated successfully!");
-        setEditingUser(null);
-        loadData();
+      await api.patch(`/users/${editingUser.id}`, payload);
+      setSuccess("User updated successfully!");
+      setEditingUser(null);
+      loadData();
     } catch (err) {
-        if (axios.isAxiosError(err)) {
-            setError(err.response?.data?.detail || "Failed to update user");
-        } else {
-            setError("An unexpected error occurred");
-        }
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail || "Failed to update user");
+      } else {
+        setError("An unexpected error occurred");
+      }
     }
   };
 
@@ -321,9 +332,59 @@ export default function Admin() {
     setEditingUser(user);
     setEditedUserEmail(user.email);
     setEditedUserRole(user.role);
-    setEditedUserPassword(""); // Clear password field
+    setEditedUserPassword("");
   };
 
+  const handleDeleteClient = async (clientId: number) => {
+    clearMessages();
+    if (
+      window.confirm(
+        "Are you sure you want to delete this client? This will also delete all associated projects and instances."
+      )
+    ) {
+      try {
+        await api.delete(`/clients/${clientId}`);
+        setSuccess("Client deleted successfully");
+        loadData();
+      } catch (err) {
+        if (axios.isAxiosError(err)) {
+          setError(err.response?.data?.detail || "Failed to delete client");
+        } else {
+          setError("Failed to delete client");
+        }
+      }
+    }
+  };
+
+  const handleUpdateClient = async () => {
+    if (!editingClient) return;
+    clearMessages();
+
+    if (editedClientName === editingClient.name) {
+      setEditingClient(null);
+      return;
+    }
+
+    try {
+      await api.patch(`/clients/${editingClient.id}`, {
+        name: editedClientName,
+      });
+      setSuccess("Client updated successfully!");
+      setEditingClient(null);
+      loadData();
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail || "Failed to update client");
+      } else {
+        setError("An unexpected error occurred");
+      }
+    }
+  };
+
+  const openClientEditModal = (client: Client) => {
+    setEditingClient(client);
+    setEditedClientName(client.name);
+  };
 
   return (
     <AppLayout>
@@ -363,11 +424,11 @@ export default function Admin() {
           </div>
         )}
 
-        <Tabs defaultValue="create" className="w-full">
+        <Tabs defaultValue="overview" className="w-full">
           <TabsList className="w-full justify-start bg-muted">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="create">Create</TabsTrigger>
             <TabsTrigger value="assign">Assign Users</TabsTrigger>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
           </TabsList>
 
           {/* CREATE TAB */}
@@ -620,11 +681,20 @@ export default function Admin() {
                               : u.projects.map((p) => p.name).join(", ")}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={() => openUserEditModal(u)}>
-                                <FileEdit className="h-4 w-4" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openUserEditModal(u)}
+                            >
+                              <FileEdit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id)} className="text-destructive hover:text-destructive/80">
-                                <Trash2 className="h-4 w-4" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteUser(u.id)}
+                              className="text-destructive hover:text-destructive/80"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -722,6 +792,59 @@ export default function Admin() {
                   </Table>
                 </CardContent>
               </Card>
+
+              {/* Clients table */}
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="text-foreground">Clients</CardTitle>
+                  <CardDescription>
+                    {clients.length} client{clients.length !== 1 ? "s" : ""}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-transparent">
+                        <TableHead className="text-muted-foreground">
+                          Client Name
+                        </TableHead>
+                        <TableHead className="text-right text-muted-foreground">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clients.map((c) => (
+                        <TableRow
+                          key={c.id}
+                          className="border-border hover:bg-muted/50"
+                        >
+                          <TableCell className="font-medium text-foreground">
+                            {c.name}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openClientEditModal(c)}
+                            >
+                              <FileEdit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteClient(c.id)}
+                              className="text-destructive hover:text-destructive/80"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>
@@ -767,10 +890,7 @@ export default function Admin() {
               </div>
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setEditingProject(null)}
-              >
+              <Button variant="outline" onClick={() => setEditingProject(null)}>
                 Cancel
               </Button>
               <Button onClick={handleUpdateProject}>Save Changes</Button>
@@ -829,13 +949,42 @@ export default function Admin() {
               </div>
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setEditingUser(null)}
-              >
+              <Button variant="outline" onClick={() => setEditingUser(null)}>
                 Cancel
               </Button>
               <Button onClick={handleUpdateUser}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {editingClient && (
+        <Dialog
+          open={!!editingClient}
+          onOpenChange={(isOpen) => !isOpen && setEditingClient(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Client</DialogTitle>
+              <DialogDescription>
+                Update the name for client "{editingClient.name}".
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-4 py-4">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-foreground">Client Name</Label>
+                <Input
+                  value={editedClientName}
+                  onChange={(e) => setEditedClientName(e.target.value)}
+                  className="bg-background"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingClient(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateClient}>Save Changes</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
