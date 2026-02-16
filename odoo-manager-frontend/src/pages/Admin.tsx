@@ -83,6 +83,12 @@ export default function Admin() {
   const [editedProjectName, setEditedProjectName] = useState("");
   const [editedProjectClientId, setEditedProjectClientId] = useState<string>("");
 
+  // User editing
+  const [editingUser, setEditingUser] = useState<UserWithProjects | null>(null);
+  const [editedUserEmail, setEditedUserEmail] = useState("");
+  const [editedUserPassword, setEditedUserPassword] = useState("");
+  const [editedUserRole, setEditedUserRole] = useState<"ADMIN" | "STANDARD">("STANDARD");
+
   const loadData = useCallback(async () => {
     try {
       const [clientsRes, usersRes, usersWithProjectsRes, projectsRes] =
@@ -259,6 +265,65 @@ export default function Admin() {
       }
     }
   };
+
+  const handleDeleteUser = async (userId: number) => {
+    clearMessages();
+    if (window.confirm("Are you sure you want to delete this user?")) {
+        try {
+            await api.delete(`/users/${userId}`);
+            setSuccess("User deleted successfully");
+            loadData();
+        } catch (err) {
+            if (axios.isAxiosError(err)) {
+                setError(err.response?.data?.detail || "Failed to delete user");
+            } else {
+                setError("Failed to delete user");
+            }
+        }
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    clearMessages();
+
+    const payload: { email?: string; password?: string; role?: "ADMIN" | "STANDARD" } = {};
+    if (editedUserEmail !== editingUser.email) {
+        payload.email = editedUserEmail;
+    }
+    if (editedUserPassword) {
+        payload.password = editedUserPassword;
+    }
+    if (editedUserRole !== editingUser.role) {
+        payload.role = editedUserRole;
+    }
+
+    if (Object.keys(payload).length === 0) {
+        setEditingUser(null);
+        return;
+    }
+
+    try {
+        await api.patch(`/users/${editingUser.id}`, payload);
+        setSuccess("User updated successfully!");
+        setEditingUser(null);
+        loadData();
+    } catch (err) {
+        if (axios.isAxiosError(err)) {
+            setError(err.response?.data?.detail || "Failed to update user");
+        } else {
+            setError("An unexpected error occurred");
+        }
+    }
+  };
+
+  const openUserEditModal = (user: UserWithProjects) => {
+    setEditingUser(user);
+    setEditedUserEmail(user.email);
+    setEditedUserRole(user.role);
+    setEditedUserPassword(""); // Clear password field
+  };
+
 
   return (
     <AppLayout>
@@ -523,6 +588,9 @@ export default function Admin() {
                         <TableHead className="text-muted-foreground">
                           Assigned Projects
                         </TableHead>
+                        <TableHead className="text-right text-muted-foreground">
+                          Actions
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -550,6 +618,14 @@ export default function Admin() {
                             {u.projects.length === 0
                               ? "None"
                               : u.projects.map((p) => p.name).join(", ")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => openUserEditModal(u)}>
+                                <FileEdit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteUser(u.id)} className="text-destructive hover:text-destructive/80">
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -698,6 +774,68 @@ export default function Admin() {
                 Cancel
               </Button>
               <Button onClick={handleUpdateProject}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {editingUser && (
+        <Dialog
+          open={!!editingUser}
+          onOpenChange={(isOpen) => !isOpen && setEditingUser(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogDescription>
+                Update the details for user {editingUser.email}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-4 py-4">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-foreground">Email</Label>
+                <Input
+                  value={editedUserEmail}
+                  onChange={(e) => setEditedUserEmail(e.target.value)}
+                  className="bg-background"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-foreground">Password</Label>
+                <Input
+                  type="password"
+                  placeholder="Leave blank to keep current password"
+                  value={editedUserPassword}
+                  onChange={(e) => setEditedUserPassword(e.target.value)}
+                  className="bg-background"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-foreground">Role</Label>
+                <Select
+                  value={editedUserRole}
+                  onValueChange={(v) =>
+                    setEditedUserRole(v as "ADMIN" | "STANDARD")
+                  }
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="STANDARD">Standard</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEditingUser(null)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateUser}>Save Changes</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

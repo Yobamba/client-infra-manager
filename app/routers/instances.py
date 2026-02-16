@@ -173,3 +173,31 @@ def update_instance(
     db.commit()
     db.refresh(instance)
     return instance
+
+@router.delete("/{instance_id}")
+def delete_instance(
+    instance_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    instance = db.query(OdooInstance).filter(OdooInstance.id == instance_id).first()
+
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Instance not found"
+        )
+
+    # Security Check
+    if current_user.role != UserRole.ADMIN:
+        assigned = db.query(ProjectUser).filter(
+            ProjectUser.project_id == instance.project_id,
+            ProjectUser.user_id == current_user.id
+        ).first()
+        if not assigned:
+            raise HTTPException(status_code=403, detail="Unauthorized")
+
+    db.delete(instance)
+    db.commit()
+
+    return {"message": "Instance deleted successfully"}

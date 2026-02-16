@@ -46,6 +46,7 @@ import {
   ExternalLink,
   Pencil,
   Plus,
+  Trash2,
 } from "lucide-react";
 
 export default function ProjectDetails() {
@@ -179,6 +180,28 @@ export default function ProjectDetails() {
         } else {
           setError(detail || "Failed to update instance");
         }
+      } else {
+        setError("An unexpected error occurred");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (instanceId: number) => {
+    if (!window.confirm("Are you sure you want to delete this instance?")) {
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      await api.delete(`/instances/${instanceId}`);
+      setSuccess("Instance deleted successfully!");
+      refreshData();
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail || "Failed to delete instance");
       } else {
         setError("An unexpected error occurred");
       }
@@ -393,9 +416,20 @@ export default function ProjectDetails() {
                           size="sm"
                           onClick={() => handleEdit(inst)}
                           className="gap-1.5 text-muted-foreground hover:text-foreground"
+                          disabled={loading}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                           Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(inst.id)}
+                          className="gap-1.5 text-destructive hover:text-destructive/80"
+                          disabled={loading}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
                         </Button>
                       </TableCell>
                     </TableRow>
