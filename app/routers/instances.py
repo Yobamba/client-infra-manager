@@ -97,7 +97,7 @@ def create_instance(
         if existing_production:
             raise HTTPException(
                 status_code=400,
-                detail="This project already has an active Production instance"
+                detail="Conflict: This project already has an active Production instance"
             )
 
     instance = OdooInstance(

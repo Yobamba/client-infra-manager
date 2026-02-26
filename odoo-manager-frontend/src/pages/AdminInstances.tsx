@@ -4,6 +4,7 @@ import api from "../api/axios";
 import type { Instance, OdooInstanceType } from "../types/instance";
 import type { Project } from "../types/project";
 import { AppLayout } from "../components/AppLayout";
+import ErrorDialog from "@/components/errorDialog";
 import {
   Card,
   CardContent,
@@ -59,6 +60,7 @@ export default function AdminInstances() {
   >({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [conflictError, setConflictError] = useState("");
   const [success, setSuccess] = useState("");
 
   const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -186,7 +188,8 @@ export default function AdminInstances() {
 
   const handleCreate = async () => {
     if (!projectId) {
-      setError("Please select a project");
+      setCreateOpen(false);
+      setConflictError("Please select a project");
       return;
     }
     setLoading(true);
@@ -268,7 +271,8 @@ export default function AdminInstances() {
     if (axios.isAxiosError(err)) {
       const detail = err.response?.data?.detail;
       if (typeof detail === "string" && detail.includes("Production")) {
-        setError(
+        setCreateOpen(false);
+        setConflictError(
           "Conflict: This project already has an active Production instance."
         );
       } else if (typeof detail === "string" && detail.includes("Conflict")) {
@@ -619,6 +623,12 @@ export default function AdminInstances() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ErrorDialog
+          open={!!conflictError}
+          message={conflictError}
+          onClose={() => setConflictError("")}
+        />
       </div>
     </AppLayout>
   );

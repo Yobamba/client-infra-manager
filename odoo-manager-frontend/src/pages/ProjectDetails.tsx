@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 import type { Instance, OdooInstanceType } from "../types/instance";
 import { AppLayout } from "../components/AppLayout";
+import ErrorDialog from "@/components/errorDialog";
 import {
   Card,
   CardContent,
@@ -55,6 +56,7 @@ export default function ProjectDetails() {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [projectName, setProjectName] = useState("");
   const [error, setError] = useState("");
+  const [conflictError, setConflictError] = useState("");
   const [notFound, setNotFound] = useState(false);
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -143,7 +145,12 @@ export default function ProjectDetails() {
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const detail = err.response?.data?.detail;
-        if (Array.isArray(detail)) {
+        if (typeof detail === "string" && detail.includes("Conflict")) {
+          setCreateOpen(false);
+          setConflictError(
+            "This project already has an active Production instance."
+          );
+        } else if (Array.isArray(detail)) {
           setError(`Validation Error: ${detail[0].msg}`);
         } else {
           setError(detail || "Failed to create instance");
@@ -185,7 +192,8 @@ export default function ProjectDetails() {
       if (axios.isAxiosError(err)) {
         const detail = err.response?.data?.detail;
         if (typeof detail === "string" && detail.includes("Conflict")) {
-          setError(
+          setCreateOpen(false);
+          setConflictError(
             "Conflict: Cannot activate - another Production instance is already active."
           );
         } else if (Array.isArray(detail)) {
@@ -522,6 +530,12 @@ export default function ProjectDetails() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ErrorDialog
+          open={!!conflictError}
+          message={conflictError}
+          onClose={() => setConflictError("")}
+        />
       </div>
     </AppLayout>
   );
