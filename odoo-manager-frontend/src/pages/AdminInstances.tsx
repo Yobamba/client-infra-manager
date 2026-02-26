@@ -188,8 +188,7 @@ export default function AdminInstances() {
 
   const handleCreate = async () => {
     if (!projectId) {
-      setCreateOpen(false);
-      setConflictError("Please select a project");
+      setError("Please select a project");
       return;
     }
     setLoading(true);
@@ -401,7 +400,7 @@ export default function AdminInstances() {
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreate} disabled={loading}>
+                <Button onClick={handleCreate} disabled={loading || !projectId}>
                   {loading ? "Creating..." : "Create Instance"}
                 </Button>
               </DialogFooter>
