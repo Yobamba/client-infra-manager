@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from .database import engine, Base
 from . import models
 from .routers import auth, projects, clients, instances, users
@@ -23,6 +24,13 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+
+@app.exception_handler(404)
+async def not_found_handler(request, exc):
+    return JSONResponse(
+        status_code=404,
+        content={"message": "Not found"}
+    )
 
 
 @app.get("/")

@@ -48,12 +48,14 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import NotFoundPage from "./NotFoundPage";
 
 export default function ProjectDetails() {
   const { id } = useParams();
   const [instances, setInstances] = useState<Instance[]>([]);
   const [projectName, setProjectName] = useState("");
   const [error, setError] = useState("");
+  const [notFound, setNotFound] = useState(false);
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -84,6 +86,11 @@ export default function ProjectDetails() {
   useEffect(() => {
     let isMounted = true;
 
+    if (!id || id === "undefined" || isNaN(Number(id))) {
+      setNotFound(true);
+      return;
+    }
+
     const loadInitialData = async () => {
       try {
         const [instRes, projRes] = await Promise.all([
@@ -98,11 +105,11 @@ export default function ProjectDetails() {
       } catch (err) {
         if (axios.isAxiosError(err)) {
           if (err.response?.status === 404) {
-            setError("Project not found.");
+            setNotFound(true);
           } else if (err.response?.status === 403) {
-            setError("You are not authorized to access this project.");
+            setNotFound(true);
           } else {
-            setError("Failed to load project.");
+            setError("An unexpected error occurred");
           }
         }
       }
@@ -238,6 +245,10 @@ export default function ProjectDetails() {
   };
 
   const activeCount = instances.filter((i) => i.is_active).length;
+
+  if (notFound) {
+    return <NotFoundPage />;
+  }
 
   return (
     <AppLayout>

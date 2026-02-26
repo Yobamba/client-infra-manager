@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import AdminInstances from "./pages/AdminInstances";
 import ProjectDetails from "./pages/ProjectDetails";
+import NotFoundPage from "./pages/NotFoundPage";
 import Admin from "./pages/Admin";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 function App() {
@@ -17,6 +18,7 @@ function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/"
         element={
@@ -52,6 +54,8 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

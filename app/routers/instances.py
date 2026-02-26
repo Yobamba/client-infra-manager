@@ -21,7 +21,7 @@ def get_instances(
     if project_id:
         project = db.query(Project).filter(Project.id == project_id).first()
         if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
+            raise HTTPException(status_code=404, detail="Not found")
 
         # 2. Security Check: Only allow if Admin or assigned to the project
         if current_user.role != UserRole.ADMIN:
@@ -30,7 +30,7 @@ def get_instances(
                 ProjectUser.user_id == current_user.id
             ).first()
             if not assigned:
-                raise HTTPException(status_code=403, detail="Access denied to this project's instances")
+                raise HTTPException(status_code=404, detail="Not found")
         
         query = query.filter(OdooInstance.project_id == project_id)
     
