@@ -192,10 +192,13 @@ export default function ProjectDetails() {
       if (axios.isAxiosError(err)) {
         const detail = err.response?.data?.detail;
         if (typeof detail === "string" && detail.includes("Conflict")) {
-          setCreateOpen(false);
-          setConflictError(
-            "Conflict: Cannot activate - another Production instance is already active."
-          );
+          setEditOpen(false);
+          setEditingId(null);
+          setTimeout(() => {
+            setConflictError(
+              "Cannot activate — another Production instance is already active."
+            );
+          }, 150);
         } else if (Array.isArray(detail)) {
           setError(`Validation Error: ${detail[0].msg}`);
         } else {
