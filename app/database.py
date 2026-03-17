@@ -13,9 +13,9 @@ engine = create_engine(
     DATABASE_URL,
     connect_args={
         "auth_token": TURSO_AUTH_TOKEN,
+        "check_same_thread": False
     },
-    poolclass=StaticPool,
-    connect_args={"check_same_thread": False}
+    poolclass=StaticPool
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
