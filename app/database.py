@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.pool import StaticPool 
 
 load_dotenv()
 
@@ -9,10 +10,12 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
 
 engine = create_engine(
-    f"{DATABASE_URL}?secure=true",
+    DATABASE_URL,
     connect_args={
         "auth_token": TURSO_AUTH_TOKEN,
-    }
+    },
+    poolclass=StaticPool,
+    connect_args={"check_same_thread": False}
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
