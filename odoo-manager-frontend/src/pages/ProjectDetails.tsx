@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 import type { Instance, OdooInstanceType } from "../types/instance";
 import { AppLayout } from "../components/AppLayout";
-import ErrorDialog from "@/components/errorDialog";
+import ErrorDialog from "../components/ErrorDialog";
 import {
   Card,
   CardContent,
