@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 
+from ..repositories.user_repo import get_user_by_email
 from ..database import get_db
 from ..models import User
 from ..auth import verify_password, hash_password, create_access_token
@@ -30,7 +31,7 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.email == form_data.username).first()
+    user = get_user_by_email(db, form_data.username)
 
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
